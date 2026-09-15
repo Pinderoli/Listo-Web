@@ -227,6 +227,17 @@ let refocusSectionId = null;
 const stackedLists = new Set();
 const expandedInStack = {};
 
+// One-shot animation flags. Every mutation does a full re-render, so
+// without these the "cards settle into a deck" / "card pops out of the
+// deck" animations would replay on every unrelated re-render (e.g.
+// checking an item) instead of just the transition that triggered them.
+let animateDeckEntrance = false;
+let animateSectionPopId = null;
+
+function stackedCardRotation(index, count) {
+  return (index - (count - 1) / 2) * 1.4;
+}
+
 function listProgress(list) {
   const items = list.sections.flatMap((s) => s.items);
   const done = items.filter((i) => i.checked).length;
@@ -336,7 +347,18 @@ function renderListView() {
       collapseStack(list.id)
     );
     listView.appendChild(backBtn);
-    if (section) listView.appendChild(renderSection(list, section));
+    if (section) {
+      const sectionEl = renderSection(list, section);
+      if (animateSectionPopId === section.id) {
+        const index = list.sections.findIndex((s) => s.id === section.id);
+        sectionEl.style.setProperty(
+          "--from-rot",
+          `${stackedCardRotation(index, list.sections.length).toFixed(2)}deg`
+        );
+        sectionEl.classList.add("pop-in");
+      }
+      listView.appendChild(sectionEl);
+    }
   } else if (stacked) {
     listView.appendChild(renderStackedDeck(list));
   } else {
@@ -345,6 +367,7 @@ function renderListView() {
     });
     listView.appendChild(renderAddSectionRow(list));
   }
+  animateSectionPopId = null;
 }
 
 function toggleStackMode(listId) {
@@ -353,17 +376,20 @@ function toggleStackMode(listId) {
     expandedInStack[listId] = null;
   } else {
     stackedLists.add(listId);
+    animateDeckEntrance = true;
   }
   render();
 }
 
 function expandStackedSection(listId, sectionId) {
   expandedInStack[listId] = sectionId;
+  animateSectionPopId = sectionId;
   render();
 }
 
 function collapseStack(listId) {
   expandedInStack[listId] = null;
+  animateDeckEntrance = true;
   render();
 }
 
@@ -371,13 +397,16 @@ function renderStackedDeck(list) {
   const deck = document.createElement("div");
   deck.className = "section-deck";
   const count = list.sections.length;
+  const shouldAnimate = animateDeckEntrance;
+  animateDeckEntrance = false;
 
   list.sections.forEach((section, index) => {
     const card = document.createElement("div");
-    card.className = "stacked-card";
+    card.className = "stacked-card" + (shouldAnimate ? " deck-in" : "");
     if (index > 0) card.style.marginTop = "-10px";
-    const rotateDeg = (index - (count - 1) / 2) * 1.4;
-    card.style.transform = `rotate(${rotateDeg.toFixed(2)}deg)`;
+    const rotateDeg = stackedCardRotation(index, count);
+    card.style.setProperty("--rot", `${rotateDeg.toFixed(2)}deg`);
+    card.style.setProperty("--i", String(index));
     card.style.zIndex = String(count - index);
 
     const { done, total } = sectionProgress(section);
