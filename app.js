@@ -128,7 +128,7 @@ function deleteItem(listId, sectionId, itemId) {
 
 // ---- Import / Export ----
 
-function exportList(listId) {
+async function exportList(listId) {
   const list = state.lists.find((l) => l.id === listId);
   if (!list) return;
   const payload = {
@@ -137,12 +137,28 @@ function exportList(listId) {
     exportedAt: new Date().toISOString(),
     list,
   };
+  const safeName = list.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "list";
+  const filename = `${safeName}.listo.json`;
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const file = new File([blob], filename, { type: "application/json" });
+
+  // On iOS/most mobile browsers this opens the native share sheet (AirDrop,
+  // Messages, etc). Falls back to a direct download where file sharing
+  // isn't supported (most desktop browsers).
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: list.name });
+      return;
+    } catch (e) {
+      if (e.name === "AbortError") return; // user dismissed the share sheet
+      console.warn("Listo: share failed, falling back to download", e);
+    }
+  }
+
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  const safeName = list.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "list";
   a.href = url;
-  a.download = `${safeName}.listo.json`;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   a.remove();
