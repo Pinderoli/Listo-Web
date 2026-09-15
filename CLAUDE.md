@@ -68,3 +68,6 @@ fresh IDs and unchecks items so an imported list starts clean.
   a clear reason, and update this file if you do.
 - Test changes by opening `index.html` directly or via a static server;
   there's no test suite yet.
+- `index.html` loads `styles.css`/`app.js` with a `?v=N` cache-busting
+  query param. GitHub Pages/Safari can cache these aggressively, so bump
+  `N` whenever either file changes or a device may keep running stale JS.
