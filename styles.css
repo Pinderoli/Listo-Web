@@ -52,6 +52,7 @@ button, input {
   font-family: inherit;
 }
 
+
 .app-header {
   display: flex;
   align-items: center;
@@ -122,6 +123,19 @@ button, input {
   padding: 6px 10px;
   font-size: 0.82rem;
   border-radius: var(--radius-sm);
+}
+
+.btn-reset {
+  background: var(--color-secondary);
+  color: #4a3200;
+  font-weight: 800;
+  padding: 10px 20px;
+  border-radius: 999px;
+  box-shadow: 0 3px 10px rgba(255, 200, 87, 0.45);
+}
+
+.btn-reset:hover {
+  background: #ffbc38;
 }
 
 .layout {
@@ -331,7 +345,8 @@ button, input {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   padding: 8px 10px;
-  font-size: 0.92rem;
+  /* Must stay >= 16px or iOS Safari zooms the page in on focus. */
+  font-size: 16px;
   background: var(--color-bg);
   color: var(--color-text);
 }

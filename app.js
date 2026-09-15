@@ -211,6 +211,12 @@ function importFromFile(file) {
 const listNav = document.getElementById("listNav");
 const listView = document.getElementById("listView");
 
+// Every mutation does a full re-render, which replaces DOM nodes and would
+// normally drop focus (and dismiss the on-screen keyboard). When set, the
+// next render refocuses the "add item" input for this section so adding
+// items in quick succession doesn't require tapping back in each time.
+let refocusSectionId = null;
+
 function listProgress(list) {
   const items = list.sections.flatMap((s) => s.items);
   const done = items.filter((i) => i.checked).length;
@@ -220,6 +226,13 @@ function listProgress(list) {
 function render() {
   renderNav();
   renderListView();
+  if (refocusSectionId) {
+    const input = listView.querySelector(
+      `[data-section-id="${refocusSectionId}"] .inline-add input`
+    );
+    refocusSectionId = null;
+    if (input) input.focus();
+  }
 }
 
 function renderNav() {
@@ -272,7 +285,7 @@ function renderListView() {
   const actions = document.createElement("div");
   actions.className = "list-actions";
 
-  const resetBtn = makeButton("Reset", "btn btn-ghost btn-sm", () => resetList(list.id));
+  const resetBtn = makeButton("↺ Reset", "btn btn-reset", () => resetList(list.id));
   const exportBtn = makeButton("Export", "btn btn-ghost btn-sm", () => exportList(list.id));
   const deleteBtn = makeButton("Delete", "btn btn-danger btn-sm", () => deleteList(list.id));
 
@@ -290,6 +303,7 @@ function renderListView() {
 function renderSection(list, section) {
   const card = document.createElement("div");
   card.className = "section-card";
+  card.dataset.sectionId = section.id;
 
   const headerEl = document.createElement("div");
   headerEl.className = "section-header";
@@ -314,12 +328,18 @@ function renderSection(list, section) {
   addItemRow.className = "inline-add";
   const input = document.createElement("input");
   input.placeholder = "Add item…";
+  const submitItem = () => {
+    if (!input.value.trim()) return;
+    refocusSectionId = section.id;
+    addItem(list.id, section.id, input.value);
+  };
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
-      addItem(list.id, section.id, input.value);
+      e.preventDefault();
+      submitItem();
     }
   });
-  const addBtn = makeButton("Add", "btn btn-primary btn-sm", () => addItem(list.id, section.id, input.value));
+  const addBtn = makeButton("Add", "btn btn-primary btn-sm", submitItem);
   addItemRow.append(input, addBtn);
   card.appendChild(addItemRow);
 
