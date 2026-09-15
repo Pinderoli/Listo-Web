@@ -55,6 +55,8 @@ function deleteList(listId) {
   if (state.activeListId === listId) {
     state.activeListId = state.lists[0]?.id ?? null;
   }
+  stackedLists.delete(listId);
+  delete expandedInStack[listId];
   save();
   render();
 }
@@ -84,7 +86,9 @@ function addSection(listId, name) {
 
 function deleteSection(listId, sectionId) {
   const list = state.lists.find((l) => l.id === listId);
-  if (!list) return;
+  const section = list?.sections.find((s) => s.id === sectionId);
+  if (!list || !section) return;
+  if (!confirm(`Delete section "${section.name}"? This can't be undone.`)) return;
   list.sections = list.sections.filter((s) => s.id !== sectionId);
   save();
   render();
@@ -217,10 +221,21 @@ const listView = document.getElementById("listView");
 // items in quick succession doesn't require tapping back in each time.
 let refocusSectionId = null;
 
+// UI-only view state (not persisted): which lists are shown as a condensed
+// stack of section cards, and which section (if any) is currently pulled
+// out of the stack for focused viewing.
+const stackedLists = new Set();
+const expandedInStack = {};
+
 function listProgress(list) {
   const items = list.sections.flatMap((s) => s.items);
   const done = items.filter((i) => i.checked).length;
   return { done, total: items.length };
+}
+
+function sectionProgress(section) {
+  const done = section.items.filter((i) => i.checked).length;
+  return { done, total: section.items.length };
 }
 
 function render() {
@@ -285,19 +300,100 @@ function renderListView() {
   const actions = document.createElement("div");
   actions.className = "list-actions";
 
-  const resetBtn = makeButton("↺ Reset", "btn btn-reset", () => resetList(list.id));
+  const { done: doneCount } = listProgress(list);
+  const resetBtn = makeButton(
+    "↺ Reset",
+    "btn btn-reset" + (doneCount > 0 ? " has-checked" : ""),
+    () => resetList(list.id)
+  );
   const exportBtn = makeButton("Export", "btn btn-ghost btn-sm", () => exportList(list.id));
   const deleteBtn = makeButton("Delete", "btn btn-danger btn-sm", () => deleteList(list.id));
 
-  actions.append(resetBtn, exportBtn, deleteBtn);
+  actions.append(resetBtn, exportBtn);
+  if (list.sections.length > 1) {
+    const stacked = stackedLists.has(list.id);
+    const stackBtn = makeButton(
+      stacked ? "▦ Unstack" : "🗂 Stack",
+      "btn btn-ghost btn-sm",
+      () => toggleStackMode(list.id)
+    );
+    actions.append(stackBtn);
+  }
+  actions.append(deleteBtn);
   header.append(titleInput, actions);
   listView.appendChild(header);
 
-  list.sections.forEach((section) => {
-    listView.appendChild(renderSection(list, section));
+  const stacked = stackedLists.has(list.id);
+  let expandedId = expandedInStack[list.id] || null;
+  if (expandedId && !list.sections.some((s) => s.id === expandedId)) {
+    expandedId = null;
+    expandedInStack[list.id] = null;
+  }
+
+  if (stacked && expandedId) {
+    const section = list.sections.find((s) => s.id === expandedId);
+    const backBtn = makeButton("‹ Back to stack", "btn btn-ghost btn-sm stack-back", () =>
+      collapseStack(list.id)
+    );
+    listView.appendChild(backBtn);
+    if (section) listView.appendChild(renderSection(list, section));
+  } else if (stacked) {
+    listView.appendChild(renderStackedDeck(list));
+  } else {
+    list.sections.forEach((section) => {
+      listView.appendChild(renderSection(list, section));
+    });
+    listView.appendChild(renderAddSectionRow(list));
+  }
+}
+
+function toggleStackMode(listId) {
+  if (stackedLists.has(listId)) {
+    stackedLists.delete(listId);
+    expandedInStack[listId] = null;
+  } else {
+    stackedLists.add(listId);
+  }
+  render();
+}
+
+function expandStackedSection(listId, sectionId) {
+  expandedInStack[listId] = sectionId;
+  render();
+}
+
+function collapseStack(listId) {
+  expandedInStack[listId] = null;
+  render();
+}
+
+function renderStackedDeck(list) {
+  const deck = document.createElement("div");
+  deck.className = "section-deck";
+  const count = list.sections.length;
+
+  list.sections.forEach((section, index) => {
+    const card = document.createElement("div");
+    card.className = "stacked-card";
+    if (index > 0) card.style.marginTop = "-10px";
+    const rotateDeg = (index - (count - 1) / 2) * 1.4;
+    card.style.transform = `rotate(${rotateDeg.toFixed(2)}deg)`;
+    card.style.zIndex = String(count - index);
+
+    const { done, total } = sectionProgress(section);
+    const title = document.createElement("span");
+    title.className = "stacked-card-title";
+    title.textContent = section.name;
+    const progress = document.createElement("span");
+    progress.className = "stacked-card-progress";
+    progress.textContent = `${done}/${total}`;
+
+    card.append(title, progress);
+    card.addEventListener("click", () => expandStackedSection(list.id, section.id));
+    deck.appendChild(card);
   });
 
-  listView.appendChild(renderAddSectionRow(list));
+  return deck;
 }
 
 function renderSection(list, section) {

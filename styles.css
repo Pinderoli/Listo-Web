@@ -125,16 +125,33 @@ button, input {
   border-radius: var(--radius-sm);
 }
 
+/* Default: nothing checked yet, so resetting would be a no-op — shown
+   as a subdued yellow outline. Once an item is checked, .has-checked
+   switches it to the bold filled "primary action" look. */
 .btn-reset {
-  background: var(--color-secondary);
-  color: #4a3200;
+  background: transparent;
+  border: 2px solid var(--color-secondary);
+  color: #8a6400;
   font-weight: 800;
-  padding: 10px 20px;
+  padding: 8px 18px;
   border-radius: 999px;
-  box-shadow: 0 3px 10px rgba(255, 200, 87, 0.45);
+  box-shadow: none;
+  transition: background-color 150ms var(--ease), box-shadow 150ms var(--ease),
+    border-color 150ms var(--ease);
 }
 
 .btn-reset:hover {
+  background: color-mix(in srgb, var(--color-secondary) 18%, transparent);
+}
+
+.btn-reset.has-checked {
+  background: var(--color-secondary);
+  border-color: transparent;
+  color: #4a3200;
+  box-shadow: 0 3px 10px rgba(255, 200, 87, 0.45);
+}
+
+.btn-reset.has-checked:hover {
   background: #ffbc38;
 }
 
@@ -202,6 +219,46 @@ button, input {
 
 .list-view {
   min-height: 200px;
+}
+
+.stack-back {
+  margin-bottom: 12px;
+}
+
+.section-deck {
+  padding-top: 4px;
+  margin-bottom: 24px;
+}
+
+.stacked-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  /* padding-top is deliberately taller than the deck's overlap (10px) so
+     a card behind the one in front never has its title text covered. */
+  padding: 14px 20px;
+  cursor: pointer;
+  transition: box-shadow 150ms var(--ease);
+}
+
+.stacked-card:hover {
+  box-shadow: 0 10px 24px rgba(32, 28, 24, 0.16);
+}
+
+.stacked-card-title {
+  font-weight: 700;
+  font-size: 1.02rem;
+}
+
+.stacked-card-progress {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  font-weight: 600;
 }
 
 .empty-state {
