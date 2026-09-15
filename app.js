@@ -139,15 +139,20 @@ async function exportList(listId) {
   };
   const safeName = list.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "list";
   const filename = `${safeName}.listo.json`;
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-  const file = new File([blob], filename, { type: "application/json" });
+  const json = JSON.stringify(payload, null, 2);
+  const blob = new Blob([json], { type: "application/json" });
+
+  // iOS Safari's share sheet only accepts a whitelist of "safe" file types
+  // (image/video/audio/pdf/text); application/json isn't on it, so the
+  // shared file is typed text/plain here even though it's saved as .json.
+  const shareFile = new File([json], filename, { type: "text/plain" });
 
   // On iOS/most mobile browsers this opens the native share sheet (AirDrop,
   // Messages, etc). Falls back to a direct download where file sharing
   // isn't supported (most desktop browsers).
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+  if (navigator.canShare && navigator.canShare({ files: [shareFile] })) {
     try {
-      await navigator.share({ files: [file], title: list.name });
+      await navigator.share({ files: [shareFile], title: list.name });
       return;
     } catch (e) {
       if (e.name === "AbortError") return; // user dismissed the share sheet
