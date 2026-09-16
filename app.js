@@ -55,7 +55,7 @@ function deleteList(listId) {
   if (state.activeListId === listId) {
     state.activeListId = state.lists[0]?.id ?? null;
   }
-  stackedLists.delete(listId);
+  unstackedLists.delete(listId);
   delete expandedInStack[listId];
   save();
   render();
@@ -222,10 +222,13 @@ const listView = document.getElementById("listView");
 // items in quick succession doesn't require tapping back in each time.
 let refocusSectionId = null;
 
-// UI-only view state (not persisted): which lists are shown as a condensed
-// stack of section cards, and which section (if any) is currently pulled
-// out of the stack for focused viewing.
-const stackedLists = new Set();
+// UI-only view state (not persisted). The condensed stack view is the
+// default for any list with more than one section — this set tracks
+// lists the user has explicitly switched to the flat "view all" list
+// instead, opt-out rather than opt-in. expandedInStack tracks which
+// section (if any) is currently pulled out of the stack for focused
+// viewing.
+const unstackedLists = new Set();
 const expandedInStack = {};
 
 // One-shot animation flags. Every mutation does a full re-render, so
@@ -323,9 +326,9 @@ function renderListView() {
 
   actions.append(resetBtn, exportBtn);
   if (list.sections.length > 1) {
-    const stacked = stackedLists.has(list.id);
+    const stacked = !unstackedLists.has(list.id);
     const stackBtn = makeButton(
-      stacked ? "▦ Unstack" : "🗂 Stack",
+      stacked ? "▦ View all" : "🗂 Stack",
       "btn btn-ghost btn-sm",
       () => toggleStackMode(list.id)
     );
@@ -335,7 +338,7 @@ function renderListView() {
   header.append(titleInput, actions);
   listView.appendChild(header);
 
-  const stacked = stackedLists.has(list.id);
+  const stacked = list.sections.length > 1 && !unstackedLists.has(list.id);
   let expandedId = expandedInStack[list.id] || null;
   if (expandedId && !list.sections.some((s) => s.id === expandedId)) {
     expandedId = null;
@@ -346,6 +349,7 @@ function renderListView() {
     listView.appendChild(renderSplitStack(list, expandedId));
   } else if (stacked) {
     listView.appendChild(renderStackedDeck(list));
+    listView.appendChild(renderAddSectionRow(list));
   } else {
     list.sections.forEach((section) => {
       listView.appendChild(renderSection(list, section));
@@ -356,12 +360,12 @@ function renderListView() {
 }
 
 function toggleStackMode(listId) {
-  if (stackedLists.has(listId)) {
-    stackedLists.delete(listId);
-    expandedInStack[listId] = null;
-  } else {
-    stackedLists.add(listId);
+  if (unstackedLists.has(listId)) {
+    unstackedLists.delete(listId);
     animateDeckEntrance = true;
+  } else {
+    unstackedLists.add(listId);
+    expandedInStack[listId] = null;
   }
   render();
 }
