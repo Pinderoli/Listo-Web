@@ -342,23 +342,7 @@ function renderListView() {
   }
 
   if (stacked && expandedId) {
-    const section = list.sections.find((s) => s.id === expandedId);
-    const backBtn = makeButton("‹ Back to stack", "btn btn-ghost btn-sm stack-back", () =>
-      collapseStack(list.id)
-    );
-    listView.appendChild(backBtn);
-    if (section) {
-      const sectionEl = renderSection(list, section);
-      if (animateSectionPopId === section.id) {
-        const index = list.sections.findIndex((s) => s.id === section.id);
-        sectionEl.style.setProperty(
-          "--from-rot",
-          `${stackedCardRotation(index, list.sections.length).toFixed(2)}deg`
-        );
-        sectionEl.classList.add("pop-in");
-      }
-      listView.appendChild(sectionEl);
-    }
+    listView.appendChild(renderSplitStack(list, expandedId));
   } else if (stacked) {
     listView.appendChild(renderStackedDeck(list));
   } else {
@@ -384,6 +368,7 @@ function toggleStackMode(listId) {
 function expandStackedSection(listId, sectionId) {
   expandedInStack[listId] = sectionId;
   animateSectionPopId = sectionId;
+  animateDeckEntrance = true;
   render();
 }
 
@@ -391,6 +376,29 @@ function collapseStack(listId) {
   expandedInStack[listId] = null;
   animateDeckEntrance = true;
   render();
+}
+
+// Builds one condensed "stacked-card" pill. Shared by the full deck and
+// the above/below mini-decks either side of an expanded section.
+function makeStackedCard(list, section, { rotateDeg, zIndex, hasMarginTop, animate, delayIndex }) {
+  const card = document.createElement("div");
+  card.className = "stacked-card" + (animate ? " deck-in" : "");
+  if (hasMarginTop) card.style.marginTop = "-10px";
+  card.style.setProperty("--rot", `${rotateDeg.toFixed(2)}deg`);
+  card.style.setProperty("--i", String(delayIndex));
+  card.style.zIndex = String(zIndex);
+
+  const { done, total } = sectionProgress(section);
+  const title = document.createElement("span");
+  title.className = "stacked-card-title";
+  title.textContent = section.name;
+  const progress = document.createElement("span");
+  progress.className = "stacked-card-progress";
+  progress.textContent = `${done}/${total}`;
+
+  card.append(title, progress);
+  card.addEventListener("click", () => expandStackedSection(list.id, section.id));
+  return card;
 }
 
 function renderStackedDeck(list) {
@@ -401,31 +409,81 @@ function renderStackedDeck(list) {
   animateDeckEntrance = false;
 
   list.sections.forEach((section, index) => {
-    const card = document.createElement("div");
-    card.className = "stacked-card" + (shouldAnimate ? " deck-in" : "");
-    if (index > 0) card.style.marginTop = "-10px";
-    const rotateDeg = stackedCardRotation(index, count);
-    card.style.setProperty("--rot", `${rotateDeg.toFixed(2)}deg`);
-    card.style.setProperty("--i", String(index));
-    card.style.zIndex = String(count - index);
-
-    const { done, total } = sectionProgress(section);
-    const title = document.createElement("span");
-    title.className = "stacked-card-title";
-    title.textContent = section.name;
-    const progress = document.createElement("span");
-    progress.className = "stacked-card-progress";
-    progress.textContent = `${done}/${total}`;
-
-    card.append(title, progress);
-    card.addEventListener("click", () => expandStackedSection(list.id, section.id));
-    deck.appendChild(card);
+    deck.appendChild(
+      makeStackedCard(list, section, {
+        rotateDeg: stackedCardRotation(index, count),
+        zIndex: count - index,
+        hasMarginTop: index > 0,
+        animate: shouldAnimate,
+        delayIndex: index,
+      })
+    );
   });
 
   return deck;
 }
 
-function renderSection(list, section) {
+// A short condensed deck holding just the sections above or below the
+// currently expanded one, so tilt stays anchored to each section's
+// original position in the full list regardless of which group it's in.
+function renderMiniDeck(list, sections, animate) {
+  const deck = document.createElement("div");
+  deck.className = "section-deck mini";
+  const total = list.sections.length;
+
+  sections.forEach((section, i) => {
+    const originalIndex = list.sections.indexOf(section);
+    deck.appendChild(
+      makeStackedCard(list, section, {
+        rotateDeg: stackedCardRotation(originalIndex, total),
+        zIndex: sections.length - i,
+        hasMarginTop: i > 0,
+        animate,
+        delayIndex: i,
+      })
+    );
+  });
+
+  return deck;
+}
+
+// Tapping a stacked card no longer opens an isolated full-screen section
+// with a "back" button — instead the tapped section expands in place,
+// with any sections before it condensed into a mini-deck above and any
+// after it condensed into a mini-deck below, so switching between
+// sections is just tapping another condensed card, no back-and-forth.
+function renderSplitStack(list, expandedId) {
+  const wrap = document.createElement("div");
+  wrap.className = "split-stack";
+
+  const expandedIndex = list.sections.findIndex((s) => s.id === expandedId);
+  const expandedSection = list.sections[expandedIndex];
+  const above = list.sections.slice(0, expandedIndex);
+  const below = list.sections.slice(expandedIndex + 1);
+
+  const shouldAnimateDeck = animateDeckEntrance;
+  animateDeckEntrance = false;
+
+  if (above.length > 0) wrap.appendChild(renderMiniDeck(list, above, shouldAnimateDeck));
+
+  const sectionEl = renderSection(list, expandedSection, {
+    onCollapse: () => collapseStack(list.id),
+  });
+  if (animateSectionPopId === expandedSection.id) {
+    sectionEl.style.setProperty(
+      "--from-rot",
+      `${stackedCardRotation(expandedIndex, list.sections.length).toFixed(2)}deg`
+    );
+    sectionEl.classList.add("pop-in");
+  }
+  wrap.appendChild(sectionEl);
+
+  if (below.length > 0) wrap.appendChild(renderMiniDeck(list, below, shouldAnimateDeck));
+
+  return wrap;
+}
+
+function renderSection(list, section, opts = {}) {
   const card = document.createElement("div");
   card.className = "section-card";
   card.dataset.sectionId = section.id;
@@ -438,11 +496,16 @@ function renderSection(list, section) {
   nameInput.value = section.name;
   nameInput.addEventListener("change", () => renameSection(list.id, section.id, nameInput.value));
 
-  const removeBtn = makeButton("Remove section", "btn btn-danger btn-sm", () =>
-    deleteSection(list.id, section.id)
+  const headerActions = document.createElement("div");
+  headerActions.className = "section-header-actions";
+  if (opts.onCollapse) {
+    headerActions.append(makeButton("▤ Collapse", "btn btn-ghost btn-sm", opts.onCollapse));
+  }
+  headerActions.append(
+    makeButton("Remove section", "btn btn-danger btn-sm", () => deleteSection(list.id, section.id))
   );
 
-  headerEl.append(nameInput, removeBtn);
+  headerEl.append(nameInput, headerActions);
   card.appendChild(headerEl);
 
   section.items.forEach((item) => {

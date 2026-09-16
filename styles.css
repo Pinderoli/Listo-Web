@@ -221,13 +221,25 @@ button, input {
   min-height: 200px;
 }
 
-.stack-back {
-  margin-bottom: 12px;
+.split-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .section-deck {
   padding-top: 4px;
   margin-bottom: 24px;
+}
+
+.split-stack .section-deck {
+  margin-bottom: 0;
+}
+
+.section-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .stacked-card {
