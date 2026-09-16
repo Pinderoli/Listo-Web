@@ -57,6 +57,7 @@ function deleteList(listId) {
   }
   unstackedLists.delete(listId);
   delete expandedInStack[listId];
+  expandedAddSection.delete(listId);
   save();
   render();
 }
@@ -221,6 +222,14 @@ const listView = document.getElementById("listView");
 // next render refocuses the "add item" input for this section so adding
 // items in quick succession doesn't require tapping back in each time.
 let refocusSectionId = null;
+let refocusAddSectionListId = null;
+
+// Which lists currently have their "Add Section" control expanded. Its
+// open/close animation is handled with plain CSS transitions on the
+// persistent DOM node directly (not through render()) so it can animate
+// smoothly in both directions; this set just keeps a from-scratch render
+// (triggered by something unrelated) showing the right state.
+const expandedAddSection = new Set();
 
 // UI-only view state (not persisted). The condensed stack view is the
 // default for any list with more than one section — this set tracks
@@ -261,6 +270,13 @@ function render() {
       `[data-section-id="${refocusSectionId}"] .inline-add input`
     );
     refocusSectionId = null;
+    if (input) input.focus();
+  }
+  if (refocusAddSectionListId) {
+    const input = listView.querySelector(
+      `.add-section[data-list-id="${refocusAddSectionListId}"] .add-section-input`
+    );
+    refocusAddSectionListId = null;
     if (input) input.focus();
   }
 }
@@ -586,18 +602,52 @@ function renderItem(list, section, item) {
 }
 
 function renderAddSectionRow(list) {
-  const row = document.createElement("div");
-  row.className = "inline-add add-section-row";
+  const wrap = document.createElement("div");
+  wrap.className = "add-section" + (expandedAddSection.has(list.id) ? " expanded" : "");
+  wrap.dataset.listId = list.id;
+
   const input = document.createElement("input");
-  input.placeholder = "Add section (e.g. Clothes, Food, Documents)…";
+  input.className = "add-section-input";
+  input.placeholder = "Add section…";
+
+  // addSection() re-renders synchronously, which tears down this very
+  // input element while it's focused — removing a focused element from
+  // the DOM fires a real "blur" event. Without this guard the blur
+  // handler below would misread that as the user clicking away and
+  // collapse the (freshly rebuilt) control right after each add.
+  let suppressBlurCollapse = false;
+  const submitSection = () => {
+    if (!input.value.trim()) return;
+    refocusAddSectionListId = list.id;
+    suppressBlurCollapse = true;
+    addSection(list.id, input.value);
+    suppressBlurCollapse = false;
+  };
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
-      addSection(list.id, input.value);
+      e.preventDefault();
+      submitSection();
     }
   });
-  const addBtn = makeButton("Add section", "btn btn-ghost btn-sm", () => addSection(list.id, input.value));
-  row.append(input, addBtn);
-  return row;
+  // Folds back in on blur, with plain CSS transitions on this persistent
+  // node (not a re-render) so it can animate smoothly either direction.
+  input.addEventListener("blur", () => {
+    if (suppressBlurCollapse) return;
+    if (!expandedAddSection.has(list.id)) return;
+    expandedAddSection.delete(list.id);
+    wrap.classList.remove("expanded");
+    input.value = "";
+  });
+
+  const trigger = makeButton("Add Section", "add-section-trigger", () => {
+    if (expandedAddSection.has(list.id)) return;
+    expandedAddSection.add(list.id);
+    wrap.classList.add("expanded");
+    input.focus();
+  });
+
+  wrap.append(trigger, input);
+  return wrap;
 }
 
 function makeButton(text, className, onClick) {
