@@ -289,6 +289,25 @@ button, input {
     animation: sectionPopIn 260ms var(--ease) both;
     transform-origin: center top;
   }
+
+  /* A newly added section is always appended last, which already puts
+     it at the back of the stack (lowest z-index) — so sliding it up
+     from further below reads as it emerging from underneath the rest
+     of the deck, no z-index juggling needed. */
+  @keyframes cardSlideFromUnder {
+    from {
+      opacity: 0;
+      transform: translateY(28px) rotate(var(--rot, 0deg));
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) rotate(var(--rot, 0deg));
+    }
+  }
+
+  .stacked-card.slide-in {
+    animation: cardSlideFromUnder 320ms var(--ease) both;
+  }
 }
 
 .stacked-card-title {
@@ -564,8 +583,8 @@ button, input {
   font-size: 16px;
   opacity: 0;
   overflow: hidden;
-  transition: width 700ms var(--ease), opacity 700ms var(--ease), padding 700ms var(--ease),
-    border-color 700ms var(--ease);
+  transition: width 400ms var(--ease), opacity 400ms var(--ease), padding 400ms var(--ease),
+    border-color 400ms var(--ease);
 }
 
 .add-section.expanded .add-section-input {

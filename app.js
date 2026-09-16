@@ -80,7 +80,9 @@ function resetList(listId) {
 function addSection(listId, name) {
   const list = state.lists.find((l) => l.id === listId);
   if (!list || !name.trim()) return;
-  list.sections.push({ id: uid(), name: name.trim(), items: [] });
+  const section = { id: uid(), name: name.trim(), items: [] };
+  list.sections.push(section);
+  animateNewCardId = section.id;
   save();
   render();
 }
@@ -246,6 +248,7 @@ const expandedInStack = {};
 // checking an item) instead of just the transition that triggered them.
 let animateDeckEntrance = false;
 let animateSectionPopId = null;
+let animateNewCardId = null;
 
 function stackedCardRotation(index, count) {
   return (index - (count - 1) / 2) * 1.4;
@@ -373,6 +376,7 @@ function renderListView() {
     listView.appendChild(renderAddSectionRow(list));
   }
   animateSectionPopId = null;
+  animateNewCardId = null;
 }
 
 function toggleStackMode(listId) {
@@ -401,9 +405,9 @@ function collapseStack(listId) {
 
 // Builds one condensed "stacked-card" pill. Shared by the full deck and
 // the above/below mini-decks either side of an expanded section.
-function makeStackedCard(list, section, { rotateDeg, zIndex, hasMarginTop, animate, delayIndex }) {
+function makeStackedCard(list, section, { rotateDeg, zIndex, hasMarginTop, animate, delayIndex, slideIn }) {
   const card = document.createElement("div");
-  card.className = "stacked-card" + (animate ? " deck-in" : "");
+  card.className = "stacked-card" + (animate ? " deck-in" : slideIn ? " slide-in" : "");
   if (hasMarginTop) card.style.marginTop = "-10px";
   card.style.setProperty("--rot", `${rotateDeg.toFixed(2)}deg`);
   card.style.setProperty("--i", String(delayIndex));
@@ -428,6 +432,8 @@ function renderStackedDeck(list) {
   const count = list.sections.length;
   const shouldAnimate = animateDeckEntrance;
   animateDeckEntrance = false;
+  const newCardId = animateNewCardId;
+  animateNewCardId = null;
 
   list.sections.forEach((section, index) => {
     deck.appendChild(
@@ -437,6 +443,7 @@ function renderStackedDeck(list) {
         hasMarginTop: index > 0,
         animate: shouldAnimate,
         delayIndex: index,
+        slideIn: section.id === newCardId,
       })
     );
   });
