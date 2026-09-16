@@ -100,6 +100,7 @@ function renameSection(listId, sectionId, name) {
   if (!section) return;
   section.name = name.trim() || section.name;
   save();
+  render();
 }
 
 function addItem(listId, sectionId, text) {
@@ -490,22 +491,44 @@ function renderSection(list, section, opts = {}) {
 
   const headerEl = document.createElement("div");
   headerEl.className = "section-header";
-
-  const nameInput = document.createElement("input");
-  nameInput.className = "section-title";
-  nameInput.value = section.name;
-  nameInput.addEventListener("change", () => renameSection(list.id, section.id, nameInput.value));
-
-  const headerActions = document.createElement("div");
-  headerActions.className = "section-header-actions";
+  // In the split-stack view (opts.onCollapse set), the whole header bar
+  // doubles as the collapse control — tapping it mirrors how tapping a
+  // condensed card opens it. The menu's own clicks stop propagation so
+  // opening/using it doesn't also collapse the section.
   if (opts.onCollapse) {
-    headerActions.append(makeButton("▤ Collapse", "btn btn-ghost btn-sm", opts.onCollapse));
+    headerEl.classList.add("collapsible");
+    headerEl.addEventListener("click", () => opts.onCollapse());
   }
-  headerActions.append(
-    makeButton("Remove section", "btn btn-danger btn-sm", () => deleteSection(list.id, section.id))
+
+  const title = document.createElement("span");
+  title.className = "section-title";
+  title.textContent = section.name;
+
+  const menu = document.createElement("details");
+  menu.className = "section-menu";
+  menu.addEventListener("click", (e) => e.stopPropagation());
+
+  const trigger = document.createElement("summary");
+  trigger.className = "section-menu-trigger";
+  trigger.textContent = "⋮";
+  trigger.setAttribute("aria-label", "Section options");
+
+  const menuList = document.createElement("div");
+  menuList.className = "section-menu-list";
+  menuList.append(
+    makeButton("Rename", "section-menu-item", () => {
+      menu.removeAttribute("open");
+      const name = prompt("Section name:", section.name);
+      if (name !== null) renameSection(list.id, section.id, name);
+    }),
+    makeButton("Delete", "section-menu-item danger", () => {
+      menu.removeAttribute("open");
+      deleteSection(list.id, section.id);
+    })
   );
 
-  headerEl.append(nameInput, headerActions);
+  menu.append(trigger, menuList);
+  headerEl.append(title, menu);
   card.appendChild(headerEl);
 
   section.items.forEach((item) => {
@@ -602,6 +625,14 @@ document.getElementById("importInput").addEventListener("change", (e) => {
   const file = e.target.files[0];
   if (file) importFromFile(file);
   e.target.value = "";
+});
+
+// Close any open section options menu when tapping outside it — <details>
+// has no native "click outside to close" behavior.
+document.addEventListener("click", (e) => {
+  document.querySelectorAll("details.section-menu[open]").forEach((d) => {
+    if (!d.contains(e.target)) d.removeAttribute("open");
+  });
 });
 
 load();
