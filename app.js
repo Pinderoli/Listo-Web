@@ -248,10 +248,23 @@ const expandedInStack = {};
 // checking an item) instead of just the transition that triggered them.
 let animateDeckEntrance = false;
 let animateSectionPopId = null;
+let animateSectionCollapseId = null;
 let animateNewCardId = null;
 
+// Per-card rotation grows with the deck below a threshold spread (so
+// small decks keep their original fan), but is capped past it — instead
+// of every added section widening the fan further, extra cards just
+// pack in tighter so a deck of 20 sections never looks more angled than
+// a deck of 8.
+const STACK_MAX_SPREAD_DEG = 16;
+const STACK_DEG_PER_CARD = 1.4;
+
 function stackedCardRotation(index, count) {
-  return (index - (count - 1) / 2) * 1.4;
+  if (count <= 1) return 0;
+  const naturalSpread = (count - 1) * STACK_DEG_PER_CARD;
+  const spread = Math.min(naturalSpread, STACK_MAX_SPREAD_DEG);
+  const step = spread / (count - 1);
+  return (index - (count - 1) / 2) * step;
 }
 
 function listProgress(list) {
@@ -393,21 +406,21 @@ function toggleStackMode(listId) {
 function expandStackedSection(listId, sectionId) {
   expandedInStack[listId] = sectionId;
   animateSectionPopId = sectionId;
-  animateDeckEntrance = true;
   render();
 }
 
 function collapseStack(listId) {
+  animateSectionCollapseId = expandedInStack[listId];
   expandedInStack[listId] = null;
-  animateDeckEntrance = true;
   render();
 }
 
 // Builds one condensed "stacked-card" pill. Shared by the full deck and
 // the above/below mini-decks either side of an expanded section.
-function makeStackedCard(list, section, { rotateDeg, zIndex, hasMarginTop, animate, delayIndex, slideIn }) {
+function makeStackedCard(list, section, { rotateDeg, zIndex, hasMarginTop, animate, delayIndex, slideIn, collapseFrom }) {
   const card = document.createElement("div");
-  card.className = "stacked-card" + (animate ? " deck-in" : slideIn ? " slide-in" : "");
+  card.className =
+    "stacked-card" + (animate ? " deck-in" : slideIn ? " slide-in" : collapseFrom ? " collapse-in" : "");
   if (hasMarginTop) card.style.marginTop = "-10px";
   card.style.setProperty("--rot", `${rotateDeg.toFixed(2)}deg`);
   card.style.setProperty("--i", String(delayIndex));
@@ -434,6 +447,8 @@ function renderStackedDeck(list) {
   animateDeckEntrance = false;
   const newCardId = animateNewCardId;
   animateNewCardId = null;
+  const collapseId = animateSectionCollapseId;
+  animateSectionCollapseId = null;
 
   list.sections.forEach((section, index) => {
     deck.appendChild(
@@ -444,6 +459,7 @@ function renderStackedDeck(list) {
         animate: shouldAnimate,
         delayIndex: index,
         slideIn: section.id === newCardId,
+        collapseFrom: section.id === collapseId,
       })
     );
   });
@@ -694,6 +710,25 @@ document.addEventListener("click", (e) => {
   document.querySelectorAll("details.section-menu[open]").forEach((d) => {
     if (!d.contains(e.target)) d.removeAttribute("open");
   });
+});
+
+// Tapping outside the expanded card in split-stack view condenses it
+// back into the deck — mirrors tapping the header, just from anywhere
+// else on the page. Clicks on a mini-deck card are excluded since those
+// already have their own handler (switch which section is expanded);
+// clicks in the list header (rename/reset/export/etc.) are excluded so
+// list-level actions don't also collapse the view.
+document.addEventListener("click", (e) => {
+  if (e.target.closest(".stacked-card")) return;
+  if (e.target.closest(".list-header")) return;
+  const list = getActiveList();
+  if (!list) return;
+  const expandedId = expandedInStack[list.id];
+  if (!expandedId) return;
+  const sectionCard = listView.querySelector(".split-stack > .section-card");
+  if (sectionCard && !sectionCard.contains(e.target)) {
+    collapseStack(list.id);
+  }
 });
 
 load();

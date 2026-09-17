@@ -277,17 +277,37 @@ button, input {
   @keyframes sectionPopIn {
     from {
       opacity: 0;
-      transform: scale(0.92) rotate(var(--from-rot, 0deg));
+      transform: translateY(22px) scale(0.78) rotate(var(--from-rot, 0deg));
     }
     to {
       opacity: 1;
-      transform: scale(1) rotate(0deg);
+      transform: translateY(0) scale(1) rotate(0deg);
     }
   }
 
   .section-card.pop-in {
-    animation: sectionPopIn 260ms var(--ease) both;
+    animation: sectionPopIn 320ms var(--ease) both;
     transform-origin: center top;
+  }
+
+  /* Reverse of the pop-in above: plays on the one stacked card that was
+     just collapsed back into the deck, so it visibly shrinks/rotates
+     down into place instead of the whole deck blinking away and fading
+     back in. Siblings that were already showing get no animation at
+     all, since they never actually left. */
+  @keyframes cardCondenseIn {
+    from {
+      opacity: 1;
+      transform: translateY(-16px) scale(1.12) rotate(0deg);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1) rotate(var(--rot, 0deg));
+    }
+  }
+
+  .stacked-card.collapse-in {
+    animation: cardCondenseIn 280ms var(--ease) both;
   }
 
   /* A newly added section is always appended last, which already puts
