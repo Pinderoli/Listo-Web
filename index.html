@@ -5,26 +5,37 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Listo</title>
   <meta name="description" content="Make, reset, and share repeatable checklists.">
-  <link rel="stylesheet" href="styles.css?v=12">
+  <link rel="stylesheet" href="styles.css?v=13">
 </head>
 <body>
   <div id="app">
     <header class="app-header">
-      <h1 class="logo">Listo</h1>
+      <div class="header-left">
+        <button id="menuBtn" class="hamburger-btn" aria-label="Open menu" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+        <h1 class="logo">Listo</h1>
+      </div>
       <div class="header-actions">
-        <button id="importBtn" class="btn btn-ghost">Import</button>
         <button id="newListBtn" class="btn btn-primary">+ New List</button>
       </div>
     </header>
 
     <div class="layout">
-      <nav id="listNav" class="list-nav"></nav>
+      <div id="navBackdrop" class="nav-backdrop"></div>
+      <aside id="navDrawer" class="nav-drawer">
+        <div class="nav-drawer-header">
+          <span class="nav-drawer-title">Your Lists</span>
+          <button id="importBtn" class="btn btn-ghost btn-sm">Import</button>
+        </div>
+        <nav id="listNav" class="list-nav"></nav>
+      </aside>
       <main id="listView" class="list-view"></main>
     </div>
 
     <input type="file" id="importInput" accept="application/json,.json" hidden>
   </div>
 
-  <script src="app.js?v=12" defer></script>
+  <script src="app.js?v=13" defer></script>
 </body>
 </html>

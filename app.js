@@ -319,6 +319,7 @@ function renderNav() {
       state.activeListId = list.id;
       save();
       render();
+      closeNavDrawer();
     });
     listNav.appendChild(item);
   });
@@ -353,10 +354,7 @@ function renderListView() {
     "btn btn-reset" + (doneCount > 0 ? " has-checked" : ""),
     () => resetList(list.id)
   );
-  const exportBtn = makeButton("Export", "btn btn-ghost btn-sm", () => exportList(list.id));
-  const deleteBtn = makeButton("Delete", "btn btn-danger btn-sm", () => deleteList(list.id));
-
-  actions.append(resetBtn, exportBtn);
+  actions.append(resetBtn);
   if (list.sections.length > 1) {
     const stacked = !unstackedLists.has(list.id);
     const stackBtn = makeButton(
@@ -366,7 +364,11 @@ function renderListView() {
     );
     actions.append(stackBtn);
   }
-  actions.append(deleteBtn);
+  const listMenu = buildDropdownMenu("List options", [
+    { label: "Export", onClick: () => exportList(list.id) },
+    { label: "Delete", danger: true, onClick: () => deleteList(list.id) },
+  ]);
+  actions.append(listMenu);
   header.append(titleInput, actions);
   listView.appendChild(header);
 
@@ -547,30 +549,16 @@ function renderSection(list, section, opts = {}) {
   title.className = "section-title";
   title.textContent = section.name;
 
-  const menu = document.createElement("details");
-  menu.className = "section-menu";
-  menu.addEventListener("click", (e) => e.stopPropagation());
-
-  const trigger = document.createElement("summary");
-  trigger.className = "section-menu-trigger";
-  trigger.textContent = "⋮";
-  trigger.setAttribute("aria-label", "Section options");
-
-  const menuList = document.createElement("div");
-  menuList.className = "section-menu-list";
-  menuList.append(
-    makeButton("Rename", "section-menu-item", () => {
-      menu.removeAttribute("open");
-      const name = prompt("Section name:", section.name);
-      if (name !== null) renameSection(list.id, section.id, name);
-    }),
-    makeButton("Delete", "section-menu-item danger", () => {
-      menu.removeAttribute("open");
-      deleteSection(list.id, section.id);
-    })
-  );
-
-  menu.append(trigger, menuList);
+  const menu = buildDropdownMenu("Section options", [
+    {
+      label: "Rename",
+      onClick: () => {
+        const name = prompt("Section name:", section.name);
+        if (name !== null) renameSection(list.id, section.id, name);
+      },
+    },
+    { label: "Delete", danger: true, onClick: () => deleteSection(list.id, section.id) },
+  ]);
   headerEl.append(title, menu);
   card.appendChild(headerEl);
 
@@ -681,6 +669,33 @@ function makeButton(text, className, onClick) {
   return btn;
 }
 
+// Builds a "⋮" trigger that reveals a small dropdown of actions — shared
+// by the per-section options menu and the per-list options menu.
+function buildDropdownMenu(ariaLabel, items) {
+  const menu = document.createElement("details");
+  menu.className = "dropdown-menu";
+  menu.addEventListener("click", (e) => e.stopPropagation());
+
+  const trigger = document.createElement("summary");
+  trigger.className = "dropdown-menu-trigger";
+  trigger.textContent = "⋮";
+  trigger.setAttribute("aria-label", ariaLabel);
+
+  const menuList = document.createElement("div");
+  menuList.className = "dropdown-menu-list";
+  items.forEach(({ label, danger, onClick }) => {
+    menuList.appendChild(
+      makeButton(label, "dropdown-menu-item" + (danger ? " danger" : ""), () => {
+        menu.removeAttribute("open");
+        onClick();
+      })
+    );
+  });
+
+  menu.append(trigger, menuList);
+  return menu;
+}
+
 function escapeHtml(str) {
   const div = document.createElement("div");
   div.textContent = str;
@@ -696,7 +711,35 @@ document.getElementById("newListBtn").addEventListener("click", () => {
 
 document.getElementById("importBtn").addEventListener("click", () => {
   document.getElementById("importInput").click();
+  closeNavDrawer();
 });
+
+// The "☰" button toggles an off-canvas drawer (holding the list nav and
+// the Import action) on narrow/mobile widths, where there's no room for
+// a permanent sidebar. On wider layouts the drawer sits inline as a
+// regular sidebar and the button is hidden, so open/close never applies.
+const navDrawer = document.getElementById("navDrawer");
+const navBackdrop = document.getElementById("navBackdrop");
+const menuBtn = document.getElementById("menuBtn");
+
+function openNavDrawer() {
+  navDrawer.classList.add("open");
+  navBackdrop.classList.add("visible");
+  menuBtn.setAttribute("aria-expanded", "true");
+}
+
+function closeNavDrawer() {
+  navDrawer.classList.remove("open");
+  navBackdrop.classList.remove("visible");
+  menuBtn.setAttribute("aria-expanded", "false");
+}
+
+menuBtn.addEventListener("click", () => {
+  if (navDrawer.classList.contains("open")) closeNavDrawer();
+  else openNavDrawer();
+});
+
+navBackdrop.addEventListener("click", closeNavDrawer);
 
 document.getElementById("importInput").addEventListener("change", (e) => {
   const file = e.target.files[0];
@@ -704,10 +747,10 @@ document.getElementById("importInput").addEventListener("change", (e) => {
   e.target.value = "";
 });
 
-// Close any open section options menu when tapping outside it — <details>
-// has no native "click outside to close" behavior.
+// Close any open dropdown menu (section or list options) when tapping
+// outside it — <details> has no native "click outside to close" behavior.
 document.addEventListener("click", (e) => {
-  document.querySelectorAll("details.section-menu[open]").forEach((d) => {
+  document.querySelectorAll("details.dropdown-menu[open]").forEach((d) => {
     if (!d.contains(e.target)) d.removeAttribute("open");
   });
 });
