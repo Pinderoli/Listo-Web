@@ -348,13 +348,11 @@ function renderListView() {
   const actions = document.createElement("div");
   actions.className = "list-actions";
 
-  const { done: doneCount } = listProgress(list);
-  const resetBtn = makeButton(
-    "↺ Reset",
-    "btn btn-reset" + (doneCount > 0 ? " has-checked" : ""),
-    () => resetList(list.id)
-  );
-  actions.append(resetBtn);
+  const listMenu = buildDropdownMenu("List options", [
+    { label: "Export", onClick: () => exportList(list.id) },
+    { label: "Delete", danger: true, onClick: () => deleteList(list.id) },
+  ]);
+  actions.append(listMenu);
   if (list.sections.length > 1) {
     const stacked = !unstackedLists.has(list.id);
     const stackBtn = makeButton(
@@ -364,11 +362,13 @@ function renderListView() {
     );
     actions.append(stackBtn);
   }
-  const listMenu = buildDropdownMenu("List options", [
-    { label: "Export", onClick: () => exportList(list.id) },
-    { label: "Delete", danger: true, onClick: () => deleteList(list.id) },
-  ]);
-  actions.append(listMenu);
+  const { done: doneCount } = listProgress(list);
+  const resetBtn = makeButton(
+    "↺ Reset",
+    "btn btn-reset" + (doneCount > 0 ? " has-checked" : ""),
+    () => resetList(list.id)
+  );
+  actions.append(resetBtn);
   header.append(titleInput, actions);
   listView.appendChild(header);
 
@@ -704,9 +704,50 @@ function escapeHtml(str) {
 
 // ---- Wiring ----
 
-document.getElementById("newListBtn").addEventListener("click", () => {
-  const name = prompt("List name:", "New List");
-  if (name !== null) createList(name);
+// Custom "New List" naming dialog, replacing the native prompt() popup.
+const newListModalBackdrop = document.getElementById("newListModalBackdrop");
+const newListModal = document.getElementById("newListModal");
+const newListModalInput = document.getElementById("newListModalInput");
+
+function openNewListModal() {
+  newListModalInput.value = "";
+  newListModalBackdrop.classList.add("visible");
+  newListModal.classList.add("visible");
+  // rAF so the input is focused after the opening transition has started
+  // rather than racing it on some browsers.
+  requestAnimationFrame(() => newListModalInput.focus());
+}
+
+function closeNewListModal() {
+  newListModalBackdrop.classList.remove("visible");
+  newListModal.classList.remove("visible");
+}
+
+function confirmNewListModal() {
+  const name = newListModalInput.value.trim();
+  if (!name) return;
+  createList(name);
+  closeNewListModal();
+}
+
+document.getElementById("newListBtn").addEventListener("click", openNewListModal);
+document.getElementById("newListDrawerBtn").addEventListener("click", () => {
+  closeNavDrawer();
+  openNewListModal();
+});
+document.getElementById("newListModalCreate").addEventListener("click", confirmNewListModal);
+document.getElementById("newListModalCancel").addEventListener("click", closeNewListModal);
+newListModalBackdrop.addEventListener("click", closeNewListModal);
+newListModalInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    confirmNewListModal();
+  }
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && newListModal.classList.contains("visible")) {
+    closeNewListModal();
+  }
 });
 
 document.getElementById("importBtn").addEventListener("click", () => {

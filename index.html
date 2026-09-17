@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Listo</title>
   <meta name="description" content="Make, reset, and share repeatable checklists.">
-  <link rel="stylesheet" href="styles.css?v=13">
+  <link rel="stylesheet" href="styles.css?v=14">
 </head>
 <body>
   <div id="app">
@@ -29,13 +29,24 @@
           <button id="importBtn" class="btn btn-ghost btn-sm">Import</button>
         </div>
         <nav id="listNav" class="list-nav"></nav>
+        <button id="newListDrawerBtn" class="btn btn-primary nav-drawer-new-list">+ New List</button>
       </aside>
       <main id="listView" class="list-view"></main>
     </div>
 
     <input type="file" id="importInput" accept="application/json,.json" hidden>
+
+    <div id="newListModalBackdrop" class="modal-backdrop"></div>
+    <div id="newListModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="newListModalTitle">
+      <h2 id="newListModalTitle" class="modal-title">New List</h2>
+      <input id="newListModalInput" class="modal-input" type="text" placeholder="e.g. Japan Trip" maxlength="80">
+      <div class="modal-actions">
+        <button id="newListModalCancel" class="btn btn-ghost">Cancel</button>
+        <button id="newListModalCreate" class="btn btn-primary">Create</button>
+      </div>
+    </div>
   </div>
 
-  <script src="app.js?v=13" defer></script>
+  <script src="app.js?v=14" defer></script>
 </body>
 </html>

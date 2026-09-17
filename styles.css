@@ -255,6 +255,15 @@ button, input {
   letter-spacing: 0.04em;
 }
 
+/* margin-top: auto pushes this to the bottom of the drawer's flex
+   column regardless of how many lists are above it — pinned to the
+   very bottom on the fixed-height mobile drawer, and to the bottom of
+   the sidebar's stretched grid height on desktop. */
+.nav-drawer-new-list {
+  margin-top: auto;
+  width: 100%;
+}
+
 .list-nav {
   display: flex;
   flex-direction: column;
@@ -712,5 +721,74 @@ button, input {
   font-weight: 700;
   padding: 2px 8px;
   border-radius: 999px;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 60;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms var(--ease);
+}
+
+.modal-backdrop.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: min(360px, calc(100vw - 48px));
+  z-index: 61;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(0.94);
+  transition: opacity 200ms var(--ease), transform 200ms var(--ease);
+}
+
+.modal.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.modal-input {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  /* Must stay >= 16px or iOS Safari zooms the page in on focus. */
+  font-size: 16px;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.modal-input:focus {
+  outline: 2px solid color-mix(in srgb, var(--color-primary) 40%, transparent);
+  outline-offset: 1px;
+  border-color: var(--color-primary);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
