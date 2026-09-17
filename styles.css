@@ -475,6 +475,13 @@ button, input {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  /* .list-header's justify-content:space-between only pushes this block
+     right while it shares a line with the title — if the header wraps
+     (narrower window, longer title) this becomes the sole item on its
+     own line and space-between has nothing left to distribute, so it
+     falls back to flex-start. margin-left:auto keeps it right-aligned
+     either way. */
+  margin-left: auto;
 }
 
 .section-card {
@@ -555,6 +562,14 @@ button, input {
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-md);
   z-index: 20;
+}
+
+/* The list-options menu sits at the left edge of the header, so its
+   dropdown opens rightward instead of the default leftward — right: 0
+   would render it off the left edge of the viewport. */
+.dropdown-menu.open-right .dropdown-menu-list {
+  right: auto;
+  left: 0;
 }
 
 .dropdown-menu-item {

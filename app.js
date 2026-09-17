@@ -348,10 +348,14 @@ function renderListView() {
   const actions = document.createElement("div");
   actions.className = "list-actions";
 
-  const listMenu = buildDropdownMenu("List options", [
-    { label: "Export", onClick: () => exportList(list.id) },
-    { label: "Delete", danger: true, onClick: () => deleteList(list.id) },
-  ]);
+  const listMenu = buildDropdownMenu(
+    "List options",
+    [
+      { label: "Export", onClick: () => exportList(list.id) },
+      { label: "Delete", danger: true, onClick: () => deleteList(list.id) },
+    ],
+    { openRight: true }
+  );
   actions.append(listMenu);
   if (list.sections.length > 1) {
     const stacked = !unstackedLists.has(list.id);
@@ -670,10 +674,14 @@ function makeButton(text, className, onClick) {
 }
 
 // Builds a "⋮" trigger that reveals a small dropdown of actions — shared
-// by the per-section options menu and the per-list options menu.
-function buildDropdownMenu(ariaLabel, items) {
+// by the per-section options menu and the per-list options menu. The
+// section menu sits at the right edge of its card, so its dropdown opens
+// leftward (the default); the list menu now sits at the left edge of the
+// header, so openRight flips it to open rightward instead — otherwise it
+// renders off the left edge of the viewport and becomes unreachable.
+function buildDropdownMenu(ariaLabel, items, { openRight = false } = {}) {
   const menu = document.createElement("details");
-  menu.className = "dropdown-menu";
+  menu.className = "dropdown-menu" + (openRight ? " open-right" : "");
   menu.addEventListener("click", (e) => e.stopPropagation());
 
   const trigger = document.createElement("summary");
