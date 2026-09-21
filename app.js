@@ -35,17 +35,13 @@ function save() {
 
 // Backfills sections saved before stack rotation became a stored
 // per-section value, and re-rolls any rotation left over from before the
-// max angle was tightened — both are idempotent, so once a section's
-// value is within range it's never touched again on a later load.
+// max angle (or the adjacent-card step limit) was tightened — all via
+// enforceRotationAdjacency, which is idempotent, so a section already
+// satisfying both rules is never touched again on a later load.
 function migrateMissingRotations() {
   let changed = false;
   state.lists.forEach((list) => {
-    list.sections.forEach((section) => {
-      if (typeof section.rotation !== "number" || Math.abs(section.rotation) > STACK_MAX_ROTATION_DEG) {
-        section.rotation = randomStackRotation();
-        changed = true;
-      }
-    });
+    if (enforceRotationAdjacency(list)) changed = true;
   });
   if (changed) save();
 }
@@ -97,7 +93,8 @@ function resetList(listId) {
 function addSection(listId, name) {
   const list = state.lists.find((l) => l.id === listId);
   if (!list || !name.trim()) return;
-  const section = { id: uid(), name: name.trim(), items: [], rotation: randomStackRotation() };
+  const prevRotation = list.sections.length > 0 ? list.sections[list.sections.length - 1].rotation : null;
+  const section = { id: uid(), name: name.trim(), items: [], rotation: randomStackRotation(prevRotation) };
   list.sections.push(section);
   animateNewCardId = section.id;
   save();
@@ -110,6 +107,9 @@ function deleteSection(listId, sectionId) {
   if (!list || !section) return;
   if (!confirm(`Delete section "${section.name}"? This can't be undone.`)) return;
   list.sections = list.sections.filter((s) => s.id !== sectionId);
+  // Removing a section can bring two previously non-adjacent sections
+  // next to each other, which might not satisfy the 1deg step limit.
+  enforceRotationAdjacency(list);
   save();
   render();
 }
@@ -210,7 +210,7 @@ function importFromFile(file) {
         sections: source.sections.map((s) => ({
           id: uid(),
           name: String(s.name ?? "Section"),
-          rotation: typeof s.rotation === "number" ? s.rotation : randomStackRotation(),
+          rotation: typeof s.rotation === "number" ? s.rotation : undefined,
           items: Array.isArray(s.items)
             ? s.items.map((i) => ({
                 id: uid(),
@@ -220,6 +220,11 @@ function importFromFile(file) {
             : [],
         })),
       };
+      // Validates each section's rotation against the overall range and
+      // the 1deg-from-the-previous-section step limit, re-rolling any
+      // that don't fit (including every one lacking a stored value, e.g.
+      // files exported before rotation existed).
+      enforceRotationAdjacency(newList);
       state.lists.push(newList);
       state.activeListId = newList.id;
       save();
@@ -274,11 +279,43 @@ let animateNewCardId = null;
 // itself, rather than computed from its position in the deck. Random
 // per-card tilt looks more like a real stack of loose cards than a
 // deliberate fan, without guaranteeing any particular card lands at the
-// extreme of the range the way a position-based spread would.
+// extreme of the range the way a position-based spread would. It's also
+// constrained to land within STACK_ROTATION_STEP_DEG of the section
+// directly above it, so neighboring cards never swing from one extreme
+// straight to the other (e.g. -2deg next to +2deg).
 const STACK_MAX_ROTATION_DEG = 2;
+const STACK_ROTATION_STEP_DEG = 1;
 
-function randomStackRotation() {
-  return +(Math.random() * STACK_MAX_ROTATION_DEG * 2 - STACK_MAX_ROTATION_DEG).toFixed(2);
+// prevRotation is the rotation of the section directly above this one in
+// the deck (null if there isn't one, e.g. the first section in a list).
+function randomStackRotation(prevRotation) {
+  let min = -STACK_MAX_ROTATION_DEG;
+  let max = STACK_MAX_ROTATION_DEG;
+  if (typeof prevRotation === "number") {
+    min = Math.max(min, prevRotation - STACK_ROTATION_STEP_DEG);
+    max = Math.min(max, prevRotation + STACK_ROTATION_STEP_DEG);
+  }
+  return +(min + Math.random() * (max - min)).toFixed(2);
+}
+
+// Walks a list's sections in order, re-rolling any rotation that's
+// missing, outside the overall range, or more than STACK_ROTATION_STEP_DEG
+// away from the section above it. Returns whether anything changed.
+function enforceRotationAdjacency(list) {
+  let prev = null;
+  let changed = false;
+  list.sections.forEach((section) => {
+    const valid =
+      typeof section.rotation === "number" &&
+      Math.abs(section.rotation) <= STACK_MAX_ROTATION_DEG &&
+      (prev === null || Math.abs(section.rotation - prev) <= STACK_ROTATION_STEP_DEG);
+    if (!valid) {
+      section.rotation = randomStackRotation(prev);
+      changed = true;
+    }
+    prev = section.rotation;
+  });
+  return changed;
 }
 
 function listProgress(list) {
