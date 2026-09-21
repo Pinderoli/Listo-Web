@@ -33,6 +33,21 @@ function save() {
   }
 }
 
+// One-time backfill for sections saved before stack rotation became a
+// stored per-section value instead of a computed one.
+function migrateMissingRotations() {
+  let changed = false;
+  state.lists.forEach((list) => {
+    list.sections.forEach((section) => {
+      if (typeof section.rotation !== "number") {
+        section.rotation = randomStackRotation();
+        changed = true;
+      }
+    });
+  });
+  if (changed) save();
+}
+
 function getActiveList() {
   return state.lists.find((l) => l.id === state.activeListId) || null;
 }
@@ -80,7 +95,7 @@ function resetList(listId) {
 function addSection(listId, name) {
   const list = state.lists.find((l) => l.id === listId);
   if (!list || !name.trim()) return;
-  const section = { id: uid(), name: name.trim(), items: [] };
+  const section = { id: uid(), name: name.trim(), items: [], rotation: randomStackRotation() };
   list.sections.push(section);
   animateNewCardId = section.id;
   save();
@@ -193,6 +208,7 @@ function importFromFile(file) {
         sections: source.sections.map((s) => ({
           id: uid(),
           name: String(s.name ?? "Section"),
+          rotation: typeof s.rotation === "number" ? s.rotation : randomStackRotation(),
           items: Array.isArray(s.items)
             ? s.items.map((i) => ({
                 id: uid(),
@@ -251,20 +267,20 @@ let animateSectionPopId = null;
 let animateSectionCollapseId = null;
 let animateNewCardId = null;
 
-// Per-card rotation grows with the deck below a threshold spread (so
-// small decks keep their original fan), but is capped past it — instead
-// of every added section widening the fan further, extra cards just
-// pack in tighter so a deck of 20 sections never looks more angled than
-// a deck of 8.
-const STACK_MAX_SPREAD_DEG = 16;
-const STACK_DEG_PER_CARD = 1.4;
+// Each section's stack tilt is a fixed random value in [-8, 8] degrees,
+// rolled once (when the section is created) and stored on the section
+// itself, rather than computed from its position in the deck. A
+// position-based spread meant more sections always pushed the front-most
+// card (the one right under the header) toward the extreme of the range,
+// and on a wide card even 8 degrees of rotation lifts its corners well
+// above its own box — enough to visibly poke into the header above.
+// Random per-card tilt removes that guarantee (the front card usually
+// isn't near the extreme) and looks more like a real stack of loose
+// cards than a deliberate fan besides.
+const STACK_MAX_ROTATION_DEG = 8;
 
-function stackedCardRotation(index, count) {
-  if (count <= 1) return 0;
-  const naturalSpread = (count - 1) * STACK_DEG_PER_CARD;
-  const spread = Math.min(naturalSpread, STACK_MAX_SPREAD_DEG);
-  const step = spread / (count - 1);
-  return (index - (count - 1) / 2) * step;
+function randomStackRotation() {
+  return +(Math.random() * STACK_MAX_ROTATION_DEG * 2 - STACK_MAX_ROTATION_DEG).toFixed(2);
 }
 
 function listProgress(list) {
@@ -459,7 +475,7 @@ function renderStackedDeck(list) {
   list.sections.forEach((section, index) => {
     deck.appendChild(
       makeStackedCard(list, section, {
-        rotateDeg: stackedCardRotation(index, count),
+        rotateDeg: section.rotation,
         zIndex: count - index,
         hasMarginTop: index > 0,
         animate: shouldAnimate,
@@ -474,18 +490,16 @@ function renderStackedDeck(list) {
 }
 
 // A short condensed deck holding just the sections above or below the
-// currently expanded one, so tilt stays anchored to each section's
-// original position in the full list regardless of which group it's in.
+// currently expanded one — each section keeps its own stored tilt
+// regardless of which group it's currently rendered in.
 function renderMiniDeck(list, sections, animate) {
   const deck = document.createElement("div");
   deck.className = "section-deck mini";
-  const total = list.sections.length;
 
   sections.forEach((section, i) => {
-    const originalIndex = list.sections.indexOf(section);
     deck.appendChild(
       makeStackedCard(list, section, {
-        rotateDeg: stackedCardRotation(originalIndex, total),
+        rotateDeg: section.rotation,
         zIndex: sections.length - i,
         hasMarginTop: i > 0,
         animate,
@@ -520,10 +534,7 @@ function renderSplitStack(list, expandedId) {
     onCollapse: () => collapseStack(list.id),
   });
   if (animateSectionPopId === expandedSection.id) {
-    sectionEl.style.setProperty(
-      "--from-rot",
-      `${stackedCardRotation(expandedIndex, list.sections.length).toFixed(2)}deg`
-    );
+    sectionEl.style.setProperty("--from-rot", `${expandedSection.rotation}deg`);
     sectionEl.classList.add("pop-in");
   }
   wrap.appendChild(sectionEl);
@@ -824,6 +835,7 @@ document.addEventListener("click", (e) => {
 });
 
 load();
+migrateMissingRotations();
 if (!state.activeListId && state.lists.length > 0) {
   state.activeListId = state.lists[0].id;
 }
