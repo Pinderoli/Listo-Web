@@ -323,10 +323,10 @@ button, input {
 
 .section-deck {
   /* Rotation pivots around each card's center, so on a wide card even a
-     small tilt lifts its corners well above its own unrotated box —
+     small tilt lifts its corners a bit above its own unrotated box —
      this clearance keeps that lift from visually poking into the
-     header above. */
-  padding-top: 36px;
+     header above. Sized for the current 2deg max tilt. */
+  padding-top: 14px;
   margin-bottom: 24px;
 }
 

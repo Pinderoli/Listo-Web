@@ -33,13 +33,15 @@ function save() {
   }
 }
 
-// One-time backfill for sections saved before stack rotation became a
-// stored per-section value instead of a computed one.
+// Backfills sections saved before stack rotation became a stored
+// per-section value, and re-rolls any rotation left over from before the
+// max angle was tightened — both are idempotent, so once a section's
+// value is within range it's never touched again on a later load.
 function migrateMissingRotations() {
   let changed = false;
   state.lists.forEach((list) => {
     list.sections.forEach((section) => {
-      if (typeof section.rotation !== "number") {
+      if (typeof section.rotation !== "number" || Math.abs(section.rotation) > STACK_MAX_ROTATION_DEG) {
         section.rotation = randomStackRotation();
         changed = true;
       }
@@ -267,17 +269,13 @@ let animateSectionPopId = null;
 let animateSectionCollapseId = null;
 let animateNewCardId = null;
 
-// Each section's stack tilt is a fixed random value in [-8, 8] degrees,
+// Each section's stack tilt is a fixed random value in [-2, 2] degrees,
 // rolled once (when the section is created) and stored on the section
-// itself, rather than computed from its position in the deck. A
-// position-based spread meant more sections always pushed the front-most
-// card (the one right under the header) toward the extreme of the range,
-// and on a wide card even 8 degrees of rotation lifts its corners well
-// above its own box — enough to visibly poke into the header above.
-// Random per-card tilt removes that guarantee (the front card usually
-// isn't near the extreme) and looks more like a real stack of loose
-// cards than a deliberate fan besides.
-const STACK_MAX_ROTATION_DEG = 8;
+// itself, rather than computed from its position in the deck. Random
+// per-card tilt looks more like a real stack of loose cards than a
+// deliberate fan, without guaranteeing any particular card lands at the
+// extreme of the range the way a position-based spread would.
+const STACK_MAX_ROTATION_DEG = 2;
 
 function randomStackRotation() {
   return +(Math.random() * STACK_MAX_ROTATION_DEG * 2 - STACK_MAX_ROTATION_DEG).toFixed(2);
