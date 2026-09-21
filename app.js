@@ -274,7 +274,7 @@ let animateSectionPopId = null;
 let animateSectionCollapseId = null;
 let animateNewCardId = null;
 
-// Each section's stack tilt is a fixed random value in [-2, 2] degrees,
+// Each section's stack tilt is a fixed random value in [-3, 3] degrees,
 // rolled once (when the section is created) and stored on the section
 // itself, rather than computed from its position in the deck. Random
 // per-card tilt looks more like a real stack of loose cards than a
@@ -282,25 +282,26 @@ let animateNewCardId = null;
 // extreme of the range the way a position-based spread would. It's also
 // constrained to land within STACK_ROTATION_STEP_DEG of the section
 // directly above it, so neighboring cards never swing from one extreme
-// straight to the other (e.g. -2deg next to +2deg).
-const STACK_MAX_ROTATION_DEG = 2;
+// straight to the other (e.g. -3deg next to +3deg). The first section in
+// a list is the one exception — always flat at 0deg, reading as a clean
+// anchor for the stack rather than tilted at random like the rest.
+const STACK_MAX_ROTATION_DEG = 3;
 const STACK_ROTATION_STEP_DEG = 1;
 
 // prevRotation is the rotation of the section directly above this one in
-// the deck (null if there isn't one, e.g. the first section in a list).
+// the deck (not a number if there isn't one, e.g. the first section in a
+// list — which always comes back flat).
 function randomStackRotation(prevRotation) {
-  let min = -STACK_MAX_ROTATION_DEG;
-  let max = STACK_MAX_ROTATION_DEG;
-  if (typeof prevRotation === "number") {
-    min = Math.max(min, prevRotation - STACK_ROTATION_STEP_DEG);
-    max = Math.min(max, prevRotation + STACK_ROTATION_STEP_DEG);
-  }
+  if (typeof prevRotation !== "number") return 0;
+  const min = Math.max(-STACK_MAX_ROTATION_DEG, prevRotation - STACK_ROTATION_STEP_DEG);
+  const max = Math.min(STACK_MAX_ROTATION_DEG, prevRotation + STACK_ROTATION_STEP_DEG);
   return +(min + Math.random() * (max - min)).toFixed(2);
 }
 
 // Walks a list's sections in order, re-rolling any rotation that's
-// missing, outside the overall range, or more than STACK_ROTATION_STEP_DEG
-// away from the section above it. Returns whether anything changed.
+// missing, outside the overall range, more than STACK_ROTATION_STEP_DEG
+// away from the section above it, or (for the first section) not exactly
+// 0. Returns whether anything changed.
 function enforceRotationAdjacency(list) {
   let prev = null;
   let changed = false;
@@ -308,7 +309,7 @@ function enforceRotationAdjacency(list) {
     const valid =
       typeof section.rotation === "number" &&
       Math.abs(section.rotation) <= STACK_MAX_ROTATION_DEG &&
-      (prev === null || Math.abs(section.rotation - prev) <= STACK_ROTATION_STEP_DEG);
+      (prev === null ? section.rotation === 0 : Math.abs(section.rotation - prev) <= STACK_ROTATION_STEP_DEG);
     if (!valid) {
       section.rotation = randomStackRotation(prev);
       changed = true;
